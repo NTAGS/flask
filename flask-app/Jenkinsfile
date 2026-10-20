@@ -8,7 +8,11 @@ pipeline {
   }
 
   parameters {
-    string(name: 'DOCKERHUB_USER', defaultValue: '', description: 'Docker Hub username')
+    string(
+      name: 'DOCKERHUB_USER',
+      defaultValue: '',
+      description: 'Docker Hub username'
+    )
   }
 
   environment {
@@ -19,52 +23,74 @@ pipeline {
   stages {
     stage('Test') {
       steps {
-        sh 'python3 -m pip install --break-system-packages -r requirements-dev.txt'
-        sh 'python3 -m pytest -q'
+        dir('flask-app') {
+          sh 'python3 -m pip install --break-system-packages -r requirements-dev.txt'
+          sh 'python3 -m pytest -q'
+        }
       }
     }
 
     stage('Build') {
       steps {
-        sh 'test -n "$DOCKERHUB_USER"'
-        sh 'docker build --platform linux/amd64 -t ${IMAGE}:${BUILD_NUMBER} -t ${IMAGE}:latest .'
+        dir('flask-app') {
+          sh 'test -n "$DOCKERHUB_USER"'
+          sh 'docker build --platform linux/amd64 -t ${IMAGE}:${BUILD_NUMBER} -t ${IMAGE}:latest .'
+        }
       }
     }
 
     stage('Push') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_TOKEN')]) {
-          sh 'echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin'
-          sh 'docker push ${IMAGE}:${BUILD_NUMBER}'
-          sh 'docker push ${IMAGE}:latest'
+        dir('flask-app') {
+          withCredentials([
+            usernamePassword(
+              credentialsId: 'dockerhub',
+              usernameVariable: 'DOCKER_USER',
+              passwordVariable: 'DOCKER_TOKEN'
+            )
+          ]) {
+            sh 'echo "$DOCKER_TOKEN" | docker login -u "$DOCKER_USER" --password-stdin'
+            sh 'docker push ${IMAGE}:${BUILD_NUMBER}'
+            sh 'docker push ${IMAGE}:latest'
+          }
         }
       }
     }
 
     stage('Helm Validate') {
       steps {
-        sh 'helm lint helm/flask-commerce'
-        sh 'helm template commerce helm/flask-commerce --set image.repository=${IMAGE} --set image.tag=${BUILD_NUMBER} --set secret.create=false --set secret.existingSecret=flask-commerce-secret > /tmp/rendered.yaml'
-        sh 'grep -q "kind: Deployment" /tmp/rendered.yaml'
-        sh 'grep -q "kind: StatefulSet" /tmp/rendered.yaml'
-        sh 'grep -q "kind: NetworkPolicy" /tmp/rendered.yaml'
+        dir('flask-app') {
+          sh 'helm lint helm/flask-commerce'
+          sh 'helm template commerce helm/flask-commerce --set image.repository=${IMAGE} --set image.tag=${BUILD_NUMBER} --set secret.create=false --set secret.existingSecret=flask-commerce-secret > /tmp/rendered.yaml'
+          sh 'grep -q "kind: Deployment" /tmp/rendered.yaml'
+          sh 'grep -q "kind: StatefulSet" /tmp/rendered.yaml'
+          sh 'grep -q "kind: NetworkPolicy" /tmp/rendered.yaml'
+        }
       }
     }
 
     stage('Deploy') {
       steps {
-        withCredentials([file(credentialsId: 'commerce-kubeconfig', variable: 'KUBECONFIG')]) {
-          sh 'helm upgrade --install commerce helm/flask-commerce --namespace ${KUBE_NAMESPACE} --create-namespace --kubeconfig "$KUBECONFIG" --set image.repository=${IMAGE} --set image.tag=${BUILD_NUMBER} --set secret.create=false --set secret.existingSecret=flask-commerce-secret --wait --timeout 10m'
+        dir('flask-app') {
+          withCredentials([
+            file(credentialsId: 'commerce-kubeconfig', variable: 'KUBECONFIG')
+          ]) {
+            sh 'helm upgrade --install commerce helm/flask-commerce --namespace ${KUBE_NAMESPACE} --create-namespace --kubeconfig "$KUBECONFIG" --set image.repository=${IMAGE} --set image.tag=${BUILD_NUMBER} --set secret.create=false --set secret.existingSecret=flask-commerce-secret --wait --timeout 10m'
+          }
         }
       }
     }
 
     stage('Verify') {
       steps {
-        withCredentials([file(credentialsId: 'commerce-kubeconfig', variable: 'KUBECONFIG')]) {
-          sh 'kubectl --kubeconfig "$KUBECONFIG" -n ${KUBE_NAMESPACE} rollout status deployment/flask-commerce --timeout=5m'
-          sh 'kubectl --kubeconfig "$KUBECONFIG" -n ${KUBE_NAMESPACE} rollout status deployment/flask-commerce-worker --timeout=5m'
-          sh 'kubectl --kubeconfig "$KUBECONFIG" -n ${KUBE_NAMESPACE} get pods,svc,ingress,hpa,pvc'
+        dir('flask-app') {
+          withCredentials([
+            file(credentialsId: 'commerce-kubeconfig', variable: 'KUBECONFIG')
+          ]) {
+            sh 'kubectl --kubeconfig "$KUBECONFIG" -n ${KUBE_NAMESPACE} rollout status deployment/flask-commerce --timeout=5m'
+            sh 'kubectl --kubeconfig "$KUBECONFIG" -n ${KUBE_NAMESPACE} rollout status deployment/flask-commerce-worker --timeout=5m'
+            sh 'kubectl --kubeconfig "$KUBECONFIG" -n ${KUBE_NAMESPACE} get pods,svc,ingress,hpa,pvc'
+          }
         }
       }
     }
