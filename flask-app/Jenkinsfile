@@ -34,7 +34,7 @@ pipeline {
       steps {
         dir('flask-app') {
           sh 'test -n "$DOCKERHUB_USER"'
-          sh 'docker build --platform linux/amd64 -t ${IMAGE}:${BUILD_NUMBER} -t ${IMAGE}:latest .'
+          sh 'docker build --platform linux/arm64 -t ${IMAGE}:${BUILD_NUMBER} -t ${IMAGE}:latest .'
         }
       }
     }
