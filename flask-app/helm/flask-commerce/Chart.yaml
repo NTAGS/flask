@@ -1,0 +1,6 @@
+apiVersion: v2
+name: flask-commerce
+description: Enterprise-style Flask commerce workload for Kubernetes learning/POC
+version: 0.2.0
+appVersion: "1.0.0"
+type: application

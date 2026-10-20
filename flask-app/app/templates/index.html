@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Flask Commerce</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f5f7fa;
+            color: #1f2937;
+        }
+
+        header {
+            background: #111827;
+            color: white;
+            padding: 18px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        header span {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .login-panel,
+        .products-panel {
+            background: white;
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .login-panel h2,
+        .products-panel h2 {
+            margin-top: 0;
+        }
+
+        .login-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        input,
+        select,
+        button {
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            font-size: 14px;
+        }
+
+        input {
+            min-width: 180px;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button.secondary {
+            background: #6b7280;
+        }
+
+        button.danger {
+            background: #dc2626;
+        }
+
+        .status {
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        .success {
+            color: #15803d;
+        }
+
+        .error {
+            color: #dc2626;
+        }
+
+        .categories {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .category-button {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .category-button.active {
+            background: #2563eb;
+            color: white;
+        }
+
+        .products {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 18px;
+        }
+
+        .product {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 18px;
+            background: #fff;
+        }
+
+        .product h3 {
+            margin: 0 0 8px;
+        }
+
+        .category {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+
+        .price {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 12px 0;
+        }
+
+        .orders {
+            margin-top: 25px;
+        }
+
+        .order {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #6b7280;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>Flask Commerce</h1>
+        <span>Commerce Application • Observability Enabled</span>
+    </header>
+
+    <div class="container">
+
+        <!-- LOGIN -->
+        <section class="login-panel">
+            <h2>Login</h2>
+
+            <div class="login-row">
+                <input id="username" type="text" placeholder="Username" value="admin">
+
+                <input id="password" type="password" placeholder="Password">
+
+                <button onclick="login()">Login</button>
+
+                <button class="secondary" onclick="logout()">
+                    Logout
+                </button>
+            </div>
+
+            <div id="login-status" class="status"></div>
+        </section>
+
+        <!-- PRODUCTS -->
+        <section class="products-panel">
+
+            <h2>Products</h2>
+
+            <div class="categories">
+                <button class="category-button active" onclick="loadProducts()">
+                    All
+                </button>
+
+                <button class="category-button" onclick="loadProducts('electronics')">
+                    Electronics
+                </button>
+
+                <button class="category-button" onclick="loadProducts('home')">
+                    Home
+                </button>
+
+                <button class="category-button" onclick="loadProducts('office')">
+                    Office
+                </button>
+
+                <button class="category-button" onclick="loadProducts('fitness')">
+                    Fitness
+                </button>
+
+                <button class="category-button" onclick="loadProducts('grocery')">
+                    Grocery
+                </button>
+            </div>
+
+            <div id="products" class="products">
+                Loading products...
+            </div>
+
+        </section>
+
+        <!-- ORDERS -->
+        <section id="orders-section" class="products-panel hidden">
+
+            <h2>My Orders</h2>
+
+            <button onclick="loadOrders()">
+                Refresh Orders
+            </button>
+
+            <div id="orders" class="orders"></div>
+
+        </section>
+
+    </div>
+
+    <footer>
+        Flask Commerce • Flask + PostgreSQL + Redis + OpenTelemetry + Prometheus
+    </footer>
+
+    <script>
+
+        let accessToken = localStorage.getItem("access_token");
+
+
+        // --------------------------------------------------
+        // LOGIN
+        // --------------------------------------------------
+
+        async function login() {
+
+            const username =
+                document.getElementById("username").value;
+
+            const password =
+                document.getElementById("password").value;
+
+            const response = await fetch("/api/v1/login", {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    username,
+                    password
+                })
+            });
+
+            const data = await response.json();
+
+            const status =
+                document.getElementById("login-status");
+
+            if (!response.ok) {
+
+                status.className = "status error";
+                status.textContent =
+                    data.error || "Login failed";
+
+                return;
+            }
+
+            accessToken = data.access_token;
+
+            localStorage.setItem(
+                "access_token",
+                accessToken
+            );
+
+            status.className = "status success";
+            status.textContent =
+                "Login successful";
+
+            document
+                .getElementById("orders-section")
+                .classList.remove("hidden");
+
+            loadOrders();
+        }
+
+
+        // --------------------------------------------------
+        // LOGOUT
+        // --------------------------------------------------
+
+        function logout() {
+
+            accessToken = null;
+
+            localStorage.removeItem(
+                "access_token"
+            );
+
+            document
+                .getElementById("orders-section")
+                .classList.add("hidden");
+
+            document
+                .getElementById("login-status")
+                .textContent =
+                "Logged out";
+        }
+
+
+        // --------------------------------------------------
+        // PRODUCTS
+        // --------------------------------------------------
+
+        async function loadProducts(category = "") {
+
+            let url = "/api/v1/products";
+
+            if (category) {
+                url +=
+                    "?category=" +
+                    encodeURIComponent(category);
+            }
+
+            const response =
+                await fetch(url);
+
+            const data =
+                await response.json();
+
+            const container =
+                document.getElementById("products");
+
+            container.innerHTML = "";
+
+            data.products.forEach(product => {
+
+                const card =
+                    document.createElement("div");
+
+                card.className = "product";
+
+                card.innerHTML = `
+            <div class="category">
+                ${product.category}
+            </div>
+
+            <h3>
+                ${product.name}
+            </h3>
+
+            <div class="price">
+                $${product.price.toFixed(2)}
+            </div>
+
+            <button
+                onclick="placeOrder(${product.id})"
+            >
+                Place Order
+            </button>
+        `;
+
+                container.appendChild(card);
+            });
+        }
+
+
+        // --------------------------------------------------
+        // PLACE ORDER
+        // --------------------------------------------------
+
+        async function placeOrder(productId) {
+
+            if (!accessToken) {
+
+                alert(
+                    "Please login before placing an order."
+                );
+
+                return;
+            }
+
+            const response =
+                await fetch("/api/v1/orders", {
+
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "Authorization":
+                            "Bearer " + accessToken,
+
+                        "Idempotency-Key":
+                            crypto.randomUUID()
+                    },
+
+                    body: JSON.stringify({
+                        product_id: productId,
+                        quantity: 1
+                    })
+                });
+
+            const data =
+                await response.json();
+
+            if (!response.ok) {
+
+                alert(
+                    data.error ||
+                    "Unable to place order"
+                );
+
+                return;
+            }
+
+            alert(
+                "Order placed: " +
+                data.order_number
+            );
+
+            loadOrders();
+        }
+
+
+        // --------------------------------------------------
+        // ORDERS
+        // --------------------------------------------------
+
+        async function loadOrders() {
+
+            if (!accessToken) {
+                return;
+            }
+
+            const response =
+                await fetch(
+                    "/api/v1/orders",
+                    {
+                        headers: {
+                            "Authorization":
+                                "Bearer " +
+                                accessToken
+                        }
+                    }
+                );
+
+            if (!response.ok) {
+                return;
+            }
+
+            const data =
+                await response.json();
+
+            const container =
+                document.getElementById("orders");
+
+            container.innerHTML = "";
+
+            if (!data.orders.length) {
+
+                container.innerHTML =
+                    "<p>No orders yet.</p>";
+
+                return;
+            }
+
+            data.orders.forEach(order => {
+
+                const div =
+                    document.createElement("div");
+
+                div.className = "order";
+
+                div.innerHTML = `
+            <strong>
+                ${order.product}
+            </strong>
+
+            <br>
+
+            Order:
+            ${order.order_number}
+
+            <br>
+
+            Quantity:
+            ${order.quantity}
+
+            <br>
+
+            Total:
+            $${order.total.toFixed(2)}
+
+            <br>
+
+            Status:
+            <strong>${order.status}</strong>
+
+            <br><br>
+
+            ${order.status !== "CANCELLED" &&
+                        order.status !== "SHIPPED" &&
+                        order.status !== "DELIVERED"
+
+                        ? `
+                    <button
+                        class="danger"
+                        onclick="cancelOrder(
+                            '${order.order_number}'
+                        )"
+                    >
+                        Cancel
+                    </button>
+                `
+                        : ""
+                    }
+
+            <button
+                class="secondary"
+                onclick="reorder(
+                    '${order.order_number}'
+                )"
+            >
+                Reorder
+            </button>
+        `;
+
+                container.appendChild(div);
+            });
+        }
+
+
+        // --------------------------------------------------
+        // CANCEL ORDER
+        // --------------------------------------------------
+
+        async function cancelOrder(orderNumber) {
+
+            const response =
+                await fetch(
+                    "/api/v1/orders/" +
+                    encodeURIComponent(orderNumber) +
+                    "/cancel",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Authorization":
+                                "Bearer " +
+                                accessToken
+                        }
+                    }
+                );
+
+            const data =
+                await response.json();
+
+            if (!response.ok) {
+
+                alert(
+                    data.error ||
+                    "Unable to cancel order"
+                );
+
+                return;
+            }
+
+            loadOrders();
+        }
+
+
+        // --------------------------------------------------
+        // REORDER
+        // --------------------------------------------------
+
+        async function reorder(orderNumber) {
+
+            const response =
+                await fetch(
+                    "/api/v1/orders/" +
+                    encodeURIComponent(orderNumber) +
+                    "/reorder",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Authorization":
+                                "Bearer " +
+                                accessToken
+                        }
+                    }
+                );
+
+            const data =
+                await response.json();
+
+            if (!response.ok) {
+
+                alert(
+                    data.error ||
+                    "Unable to reorder"
+                );
+
+                return;
+            }
+
+            alert(
+                "New order created: " +
+                data.order_number
+            );
+
+            loadOrders();
+        }
+
+
+        // --------------------------------------------------
+        // INITIAL LOAD
+        // --------------------------------------------------
+
+        loadProducts();
+
+        if (accessToken) {
+
+            document
+                .getElementById("orders-section")
+                .classList.remove("hidden");
+
+            document
+                .getElementById("login-status")
+                .className =
+                "status success";
+
+            document
+                .getElementById("login-status")
+                .textContent =
+                "Logged in";
+
+            loadOrders();
+        }
+
+    </script>
+
+</body>
+
+</html>

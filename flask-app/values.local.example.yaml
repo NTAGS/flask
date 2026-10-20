@@ -1,0 +1,11 @@
+image:
+  repository: YOUR_DOCKERHUB_USER/flask-commerce
+  tag: latest
+secret:
+  create: true
+  jwtSecret: replace-with-a-long-random-value
+  adminUsername: admin
+  adminPassword: password
+  postgresPassword: commerce
+ingress:
+  host: commerce.local

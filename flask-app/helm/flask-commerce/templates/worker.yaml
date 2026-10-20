@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flask-commerce.fullname" . }}-worker
+  labels:
+    app.kubernetes.io/name: {{ include "flask-commerce.name" . }}-worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "flask-commerce.name" . }}-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "flask-commerce.name" . }}-worker
+    spec:
+      serviceAccountName: {{ include "flask-commerce.fullname" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["python", "-m", "app.worker"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "flask-commerce.fullname" . }}-config
+            - secretRef:
+                name: {{ include "flask-commerce.secretName" . }}
+          env:
+            - name: DATABASE_URL
+              value: "postgresql+psycopg://{{ .Values.postgres.username }}:$(POSTGRES_PASSWORD)@postgres:5432/{{ .Values.postgres.database }}"
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
